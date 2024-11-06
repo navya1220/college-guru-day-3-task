@@ -60,6 +60,17 @@ const RegisterSchema = new mongoose.Schema({
       },
       message: props => `${props.value} is not a valid OTP format!`
     }
+  },
+
+  otpExpires: {
+    type: Date,
+    default: Date.now,
+    expires: 300 
+  },
+
+  isOtpVerified: {
+    type: Boolean,
+    default: false
   }
 });
 

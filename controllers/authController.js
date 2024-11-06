@@ -1,6 +1,8 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import RegisterModel from '../models/userRegister.js';
+import { generateOTP, otpExpiry } from '../utils/otp.js';
+import { sendOTP } from '../utils/email.js';
 
 
 export const registerUser = async (req, res) => {
@@ -11,8 +13,11 @@ export const registerUser = async (req, res) => {
       if (existingUser) {
         return res.status(409).json({ message: 'User with this email or mobile number already exists' });
       }
-  
-      const newUser = new RegisterModel({ name, email, mobileNumber, stream, level, password });
+      
+      const otp = generateOTP();
+      const otpExpires = otpExpiry();
+      const newUser = new RegisterModel({ name, email, mobileNumber, stream, level, password, otp, otpExpires });
+      await sendOTP(email, otp);
       await newUser.save();
       const token = jwt.sign({ userId: newUser._id, email: newUser.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
   
@@ -22,6 +27,29 @@ export const registerUser = async (req, res) => {
         ? Object.values(error.errors).map(err => err.message).join('. ')
         : 'Server error, please try again later';
       res.status(500).json({ message: errorMessage });
+    }
+  };
+
+
+  export const verifyOTP = async (req, res) => {
+    const { email, otp } = req.body;
+  
+    try {
+      const user = await RegisterModel.findOne({ email });
+      if (!user) return res.status(404).json({ message: 'User not found' });
+  
+      if (user.otp !== otp || user.otpExpires < Date.now()) {
+        return res.status(400).json({ message: 'Invalid or expired OTP' });
+      }
+  
+      user.verified = true;
+      user.otp = null;
+      user.otpExpires = null;
+      await user.save();
+  
+      res.status(200).json({ message: 'OTP verified successfully' });
+    } catch (error) {
+      res.status(500).json({ message: 'Error verifying OTP' });
     }
   };
 
