@@ -40,7 +40,17 @@ const RegisterSchema = new mongoose.Schema({
     required: true,
   },
 
-  password: { type: String, required: true },
+  password: {
+    type: String,
+    required: true,
+    validate: {
+      validator: function (v) {
+        const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+        return regex.test(v);
+      },
+      message: 'Password must be at least 8 characters long, include one uppercase letter, one lowercase letter, one number, and one special character.'
+    }
+  },
 
   otp: {
     type: String,
