@@ -52,7 +52,7 @@ const RegisterSchema = new mongoose.Schema({
     }
   },
 
-  otp: {
+ /* otp: {
     type: String,
     validate: {
       validator: function (v) {
@@ -71,7 +71,7 @@ const RegisterSchema = new mongoose.Schema({
   isOtpVerified: {
     type: Boolean,
     default: false
-  }
+  } */
 });
 
 RegisterSchema.pre('save', async function (next) {
