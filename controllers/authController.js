@@ -1,8 +1,9 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import RegisterModel from '../models/userRegister.js';
-//import { generateOTP, otpExpiry } from '../utils/otp.js';
-//import { sendOTP } from '../utils/email.js';
+import PreferenceModel from '../models/coursePreference.js';
+import { generateOTP, otpExpiry } from '../utils/otp.js';
+import { sendOTP } from '../utils/email.js';
 
 
 export const registerUser = async (req, res) => {
@@ -14,10 +15,10 @@ export const registerUser = async (req, res) => {
         return res.status(409).json({ message: 'User with this email or mobile number already exists' });
       }
       
-      //const otp = generateOTP();
-      //const otpExpires = otpExpiry();
-      const newUser = new RegisterModel({ name, email, mobileNumber, stream, level, password });
-      //await sendOTP(email, otp);
+      const otp = generateOTP();
+      const otpExpires = otpExpiry();
+      const newUser = new RegisterModel({ name, email, mobileNumber, stream, level, password, otp, otpExpires });
+      await sendOTP(email, otp);
       await newUser.save();
       const token = jwt.sign({ userId: newUser._id, email: newUser.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
   
@@ -31,7 +32,7 @@ export const registerUser = async (req, res) => {
   };
 
 
- /* export const verifyOTP = async (req, res) => {
+ export const verifyOTP = async (req, res) => {
     const { email, otp } = req.body;
   
     try {
@@ -53,7 +54,6 @@ export const registerUser = async (req, res) => {
     }
   };
 
-*/
 
 export const loginUser = async (req, res) => {
   const { email, password } = req.body;
@@ -124,6 +124,83 @@ export const updateUserProfile = async (req, res) => {
 };
 
 
+
 export const logoutUser = (req, res) => {
   res.status(200).json({ message: 'Logout successful' });
 };
+
+export const  forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  try {
+    const user = await user.findOne({ email });
+    if (!user) return res.status(404).json({ error: "User with this email does not exist." });
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = Date.now() + 300000; 
+    user.resetOtp = otp;
+    user.resetOtpExpires = otpExpires;
+    await user.save();
+    res.json({ message: "OTP generated successfully.", otp });
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error." });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+  try {
+    const user = await user.findOne({ email, resetOtp: otp, resetOtpExpires: { $gt: Date.now() } });
+    if (!user) return res.status(400).json({ error: "Invalid or expired OTP." });
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    user.resetOtp = undefined;
+    user.resetOtpExpires = undefined;
+    await user.save();
+    res.json({ message: "Password has been reset successfully." });
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error." });
+  }
+};
+
+
+export const getUserPreferences = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const preferences = await PreferenceModel.findOne({ userId });
+    if (!preferences) {
+      return res.status(404).json({ message: 'Preferences not found' });
+    }
+
+    res.status(200).json({ preferences });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error while retrieving preferences' });
+  }
+};
+
+
+export const updateUserPreferences = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { savedCourses, savedColleges } = req.body;
+
+    let preferences = await CoursePreference.findOne({ userId });
+    
+    if (preferences) {
+      if (savedCourses) preferences.savedCourses = savedCourses;
+      if (savedColleges) preferences.savedColleges = savedColleges;
+    } else {
+      preferences = new CoursePreference({
+        userId,
+        savedCourses: savedCourses || [],
+        savedColleges: savedColleges || []
+      });
+    }
+    await preferences.save();
+    res.status(200).json({ message: 'Preferences updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error while updating preferences' });
+  }
+};
+
+

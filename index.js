@@ -14,6 +14,11 @@ app.use(cors());
 
 app.use('/api/users', users);
 
+app.use((req, res, next) => {
+  console.log('Incoming request headers:', req.headers);
+  next();
+});
+
 const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
