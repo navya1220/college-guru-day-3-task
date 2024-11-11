@@ -53,7 +53,7 @@ const RegisterSchema = new mongoose.Schema({
   },
 
  otp: {
-    type: String,
+    type: Number,
     validate: {
       validator: function (v) {
         return /^\d{4,6}$/.test(v);

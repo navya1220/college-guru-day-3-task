@@ -14,11 +14,11 @@ export const registerUser = async (req, res) => {
       if (existingUser) {
         return res.status(409).json({ message: 'User with this email or mobile number already exists' });
       }
-      
       const otp = generateOTP();
       const otpExpires = otpExpiry();
       const newUser = new RegisterModel({ name, email, mobileNumber, stream, level, password, otp, otpExpires });
       await sendOTP(email, otp);
+      console.log(otp)
       await newUser.save();
       const token = jwt.sign({ userId: newUser._id, email: newUser.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
   
@@ -32,27 +32,7 @@ export const registerUser = async (req, res) => {
   };
 
 
- export const verifyOTP = async (req, res) => {
-    const { email, otp } = req.body;
-  
-    try {
-      const user = await RegisterModel.findOne({ email });
-      if (!user) return res.status(404).json({ message: 'User not found' });
-  
-      if (user.otp !== otp || user.otpExpires < Date.now()) {
-        return res.status(400).json({ message: 'Invalid or expired OTP' });
-      }
-  
-      user.verified = true;
-      user.otp = null;
-      user.otpExpires = null;
-      await user.save();
-  
-      res.status(200).json({ message: 'OTP verified successfully' });
-    } catch (error) {
-      res.status(500).json({ message: 'Error verifying OTP' });
-    }
-  };
+ 
 
 
 export const loginUser = async (req, res) => {
@@ -73,6 +53,28 @@ export const loginUser = async (req, res) => {
     res.status(200).json({ message: 'Login successful', token });
   } catch (error) {
     res.status(500).json({ message: 'Server error, please try again later' });
+  }
+};
+
+export const verifyOTP = async (req, res) => {
+  const { email, otp } = req.body;
+
+  try {
+    const user = await RegisterModel.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (user.otp !== otp || user.otpExpires < Date.now()) {
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    user.isOtpVerified = true;
+    user.otp = null;
+    user.otpExpires = null;
+    await user.save();
+
+    res.status(200).json({ message: 'OTP verified successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error verifying OTP' });
   }
 };
 
