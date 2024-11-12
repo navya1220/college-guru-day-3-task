@@ -1,27 +1,23 @@
 import jwt from 'jsonwebtoken';
+import RegisterModel from '../models/userRegister.js';
 
-export const authenticateJWT = (req, res, next) => {
+export const authenticateJWT = async (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) return res.status(401).json({ message: 'Token not provided' });
+
   try {
-    const authHeader = req.headers?.authorization;
-    if (!authHeader) {
-      console.error('Authorization header is missing');
-      return res.status(401).json({ message: 'Authorization header is missing' });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await RegisterModel.findById(decoded.userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
-    const token = authHeader.split(' ')[1];
-    if (!token) {
-      console.error('Authorization token is missing');
-      return res.status(401).json({ message: 'Authorization token is missing' });
-    }
-    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-      if (err) {
-        console.error('JWT verification failed:', err.message);
-        return res.status(403).json({ message: 'Invalid or expired token' });
-      }
-      req.user = decoded;
-      next();
-    });
+
+    req.user = user;
+    next();
   } catch (error) {
-    console.error('Error in authenticateJWT middleware:', error);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(403).json({ message: 'Invalid or expired token' });
   }
 };

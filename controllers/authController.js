@@ -1,7 +1,6 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import RegisterModel from '../models/userRegister.js';
-import PreferenceModel from '../models/coursePreference.js';
 import { generateOTP, otpExpiry } from '../utils/otp.js';
 import { sendOTP } from '../utils/email.js';
 
@@ -81,6 +80,7 @@ export const verifyOTP = async (req, res) => {
 
 export const getUserProfile = async (req, res) => {
   try {
+    console.log('User from token:', req.user);
     const user = await RegisterModel.findById(req.user.userId).select('-password -otp -otpExpires');
     if (!user) return res.status(404).json({ message: 'User not found' });
     res.status(200).json(user);
@@ -167,17 +167,20 @@ export const resetPassword = async (req, res) => {
 
 
 export const getUserPreferences = async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const preferences = await PreferenceModel.findOne({ userId });
-    if (!preferences) {
-      return res.status(404).json({ message: 'Preferences not found' });
-    }
+    try {
+      const userId = req.user._id;
 
-    res.status(200).json({ preferences });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error while retrieving preferences' });
-  }
+      const user = await RegisterModel.findById(userId).populate('courses');
+  
+      if (!user || user.courses.length === 0) {
+        return res.status(404).json({ message: 'No registered courses found' });
+      }
+  
+      res.status(200).json({ registeredCourses: user.courses });
+    } catch (error) {
+      console.error('Error fetching registered courses:', error);
+      res.status(500).json({ message: 'Server error while retrieving registered courses' });
+    }
 };
 
 
