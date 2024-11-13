@@ -206,28 +206,6 @@ export const getUserPreferences = async (req, res) => {
 
 
 
-export const updateUserPreferences = async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const { savedCourses, savedColleges } = req.body;
 
-    let preferences = await CoursePreference.findOne({ userId });
-    
-    if (preferences) {
-      if (savedCourses) preferences.savedCourses = savedCourses;
-      if (savedColleges) preferences.savedColleges = savedColleges;
-    } else {
-      preferences = new CoursePreference({
-        userId,
-        savedCourses: savedCourses || [],
-        savedColleges: savedColleges || []
-      });
-    }
-    await preferences.save();
-    res.status(200).json({ message: 'Preferences updated successfully' });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error while updating preferences' });
-  }
-};
 
 

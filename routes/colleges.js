@@ -5,7 +5,7 @@ const router = express.Router();
 
 
 router.post("/", authenticateJWT,  createCollege);
-router.post("/colleges/:id/reviews", authenticateJWT, addReview);
-router.get("/colleges/:id/reviews", getReviews);
+router.post("/:id/reviews", authenticateJWT, addReview);
+router.get("/:id/reviews", getReviews);
 
 export default router;
