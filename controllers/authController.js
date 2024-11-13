@@ -59,13 +59,12 @@ export const verifyOTP = async (req, res) => {
   const { email, otp } = req.body;
 
   try {
-    const user = await RegisterModel.findOne({ email });
+    const user = await RegisterModel.findOne({ email});
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     if (user.otp !== otp || user.otpExpires < Date.now()) {
       return res.status(400).json({ message: 'Invalid or expired OTP' });
     }
-
     user.isOtpVerified = true;
     user.otp = null;
     user.otpExpires = null;
@@ -167,21 +166,44 @@ export const resetPassword = async (req, res) => {
 
 
 export const getUserPreferences = async (req, res) => {
-    try {
-      const userId = req.user._id;
+  try {
+    const userId = req.user._id;
+    
+    const user = await RegisterModel.findById(userId)
+      .populate('colleges');
+    const user1 = await RegisterModel.findById(userId).populate('courses');
 
-      const user = await RegisterModel.findById(userId).populate('courses');
-  
-      if (!user || user.courses.length === 0) {
-        return res.status(404).json({ message: 'No registered courses found' });
-      }
-  
-      res.status(200).json({ registeredCourses: user.courses });
-    } catch (error) {
-      console.error('Error fetching registered courses:', error);
-      res.status(500).json({ message: 'Server error while retrieving registered courses' });
+    console.log('Before population:', user.colleges);
+
+    console.log('After population:', user.colleges);
+
+    if (!user || !user1.courses || !user.colleges) {
+      return res.status(404).json({ message: 'No registered courses or colleges found' });
     }
+
+    const registeredCourses = Array.isArray(user.courses) ? user1.courses : [];
+    const registeredColleges = Array.isArray(user.colleges) ? user.colleges : [];
+
+    if (registeredCourses.length === 0 && registeredColleges.length === 0) {
+      return res.status(404).json({ message: 'No registered courses or colleges found' });
+    }
+
+    const response = {
+      registeredCourses,
+      registeredColleges,
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Error fetching registered courses and colleges:', error);
+    res.status(500).json({ message: 'Server error while retrieving registered preferences' });
+  }
 };
+
+
+
+
+
 
 
 export const updateUserPreferences = async (req, res) => {

@@ -52,7 +52,7 @@ const RegisterSchema = new mongoose.Schema({
     }
   },
 
- otp: {
+ /* otp: {
     type: Number,
     validate: {
       validator: function (v) {
@@ -79,8 +79,11 @@ const RegisterSchema = new mongoose.Schema({
 
   resetOtpExpires: { 
     type: Date 
-  },
+  }, */
+  colleges: [{ type: mongoose.Schema.Types.ObjectId, ref: 'College' }],
   courses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
+
+  
 });
 
 RegisterSchema.pre('save', async function (next) {
