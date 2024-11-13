@@ -168,44 +168,23 @@ export const resetPassword = async (req, res) => {
 export const getUserPreferences = async (req, res) => {
   try {
     const userId = req.user._id;
-    
+    const userId1 = req.user._id;
+    console.log(userId1);
+    console.log(userId);
     const user = await RegisterModel.findById(userId)
-      .populate('colleges');
-    const user1 = await RegisterModel.findById(userId).populate('courses');
+      .populate({ path: 'colleges', model: 'College' })
+      .populate('courses');
 
-    console.log('Before population:', user.colleges);
-
-    console.log('After population:', user.colleges);
-
-    if (!user || !user1.courses || !user.colleges) {
+    if (!user || (!user.courses.length && !user.colleges.length)) {
       return res.status(404).json({ message: 'No registered courses or colleges found' });
     }
 
-    const registeredCourses = Array.isArray(user.courses) ? user1.courses : [];
-    const registeredColleges = Array.isArray(user.colleges) ? user.colleges : [];
+    const registeredCourses = user.courses || [];
+    const registeredColleges = user.colleges || [];
 
-    if (registeredCourses.length === 0 && registeredColleges.length === 0) {
-      return res.status(404).json({ message: 'No registered courses or colleges found' });
-    }
-
-    const response = {
-      registeredCourses,
-      registeredColleges,
-    };
-
-    res.status(200).json(response);
+    res.status(200).json({ registeredCourses, registeredColleges });
   } catch (error) {
-    console.error('Error fetching registered courses and colleges:', error);
-    res.status(500).json({ message: 'Server error while retrieving registered preferences' });
+    console.error('Error fetching preferences:', error);
+    res.status(500).json({ message: 'Server error while retrieving preferences' });
   }
 };
-
-
-
-
-
-
-
-
-
-
