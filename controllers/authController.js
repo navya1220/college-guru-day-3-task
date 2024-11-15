@@ -3,32 +3,49 @@ import jwt from 'jsonwebtoken';
 import RegisterModel from '../models/userRegister.js';
 import { generateOTP, otpExpiry } from '../utils/otp.js';
 import { sendOTP } from '../utils/email.js';
+import { sendNotification } from '../services/notificationService.js';
 
 
 export const registerUser = async (req, res) => {
-    const { name, email, mobileNumber, stream, level, password } = req.body;
-  
-    try {
-      const existingUser = await RegisterModel.findOne({ $or: [{ email }, { mobileNumber }] });
-      if (existingUser) {
-        return res.status(409).json({ message: 'User with this email or mobile number already exists' });
-      }
-      const otp = generateOTP();
-      const otpExpires = otpExpiry();
-      const newUser = new RegisterModel({ name, email, mobileNumber, stream, level, password, otp, otpExpires });
-      await sendOTP(email, otp);
-      console.log(otp)
-      await newUser.save();
-      const token = jwt.sign({ userId: newUser._id, email: newUser.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
-  
-      res.status(201).json({ message: 'User registered successfully', token });
-    } catch (error) {
-      const errorMessage = error.name === 'ValidationError'
+  const { name, email, mobileNumber, stream, level, password } = req.body;
+
+  try {
+    const existingUser = await RegisterModel.findOne({ $or: [{ email }, { mobileNumber }] });
+    if (existingUser) {
+      return res.status(409).json({ message: 'User with this email or mobile number already exists' });
+    }
+    const otp = generateOTP();
+    const otpExpires = otpExpiry();
+    const newUser = new RegisterModel({
+      name,
+      email,
+      mobileNumber,
+      stream,
+      level,
+      password,
+      otp,
+      otpExpires
+    });
+
+    await sendOTP(email, otp);
+    console.log('OTP:', otp);
+
+    await newUser.save();
+    const token = jwt.sign({ userId: newUser._id, email: newUser.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+    const message = `Welcome ${name}! Your registration was successful. Your OTP is ${otp}.`;
+
+    await sendNotification(newUser._id, message, null, email);
+
+    res.status(201).json({ message: 'User registered successfully', token });
+  } catch (error) {
+    const errorMessage =
+      error.name === 'ValidationError'
         ? Object.values(error.errors).map(err => err.message).join('. ')
         : 'Server error, please try again later';
-      res.status(500).json({ message: errorMessage });
-    }
-  };
+    res.status(500).json({ message: errorMessage });
+  }
+};
 
 
  

@@ -47,3 +47,5 @@ export const createCourse = async (req, res) => {
     res.status(500).json({ message: `Server error while adding course: ${error.message}` });
   }
 };
+
+
