@@ -1,9 +1,12 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import RegisterModel from '../models/userRegister.js';
-import { generateOTP, otpExpiry } from '../utils/otp.js';
+import { otpExpiry } from '../utils/otp.js';
 import { sendOTP } from '../utils/email.js';
 import { sendNotification } from '../services/notificationService.js';
+import otpGenerator from 'otp-generator';
+
+
 
 
 export const registerUser = async (req, res) => {
@@ -12,30 +15,43 @@ export const registerUser = async (req, res) => {
   try {
     const existingUser = await RegisterModel.findOne({ $or: [{ email }, { mobileNumber }] });
     if (existingUser) {
-      return res.status(409).json({ message: 'User with this email or mobile number already exists' });
+      const conflictField = existingUser.email === email ? 'email' : 'mobile number';
+      return res.status(409).json({ message: `User with this ${conflictField} already exists` });
     }
-    const otp = generateOTP();
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const otp = otpGenerator.generate(6, { upperCaseAlphabets: false, specialChars: false });
     const otpExpires = otpExpiry();
+
     const newUser = new RegisterModel({
       name,
       email,
       mobileNumber,
       stream,
       level,
-      password,
+      password: hashedPassword,
       otp,
       otpExpires
     });
 
-    await sendOTP(email, otp);
-    console.log('OTP:', otp);
+    try {
+      await sendOTP(email, otp);
+    } catch (err) {
+      return res.status(500).json({ message: 'Failed to send OTP. Please try again later.' });
+    }
 
     await newUser.save();
+
+
     const token = jwt.sign({ userId: newUser._id, email: newUser.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
     const message = `Welcome ${name}! Your registration was successful. Your OTP is ${otp}.`;
-
-    await sendNotification(newUser._id, message, null, email);
+    try {
+      await sendNotification(newUser._id, message, null, email);
+    } catch (err) {
+      console.error('Notification failed:', err);
+    }
 
     res.status(201).json({ message: 'User registered successfully', token });
   } catch (error) {
@@ -76,22 +92,28 @@ export const verifyOTP = async (req, res) => {
   const { email, otp } = req.body;
 
   try {
-    const user = await RegisterModel.findOne({ email});
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    console.log(`Email: ${email}`);
+    const user = await RegisterModel.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
     if (user.otp !== otp || user.otpExpires < Date.now()) {
       return res.status(400).json({ message: 'Invalid or expired OTP' });
     }
-    user.isOtpVerified = true;
+
     user.otp = null;
     user.otpExpires = null;
-    await user.save();
-
+    user.isOtpVerified = true; 
+   
     res.status(200).json({ message: 'OTP verified successfully' });
+    await user.save();
   } catch (error) {
+    console.error('Error verifying OTP:', error);
     res.status(500).json({ message: 'Error verifying OTP' });
   }
 };
+
 
 
 export const getUserProfile = async (req, res) => {
@@ -203,5 +225,41 @@ export const getUserPreferences = async (req, res) => {
   } catch (error) {
     console.error('Error fetching preferences:', error);
     res.status(500).json({ message: 'Server error while retrieving preferences' });
+  }
+};
+
+
+
+export const updateUserPreferences = async (req, res) => {
+  const userId = req.user._id; 
+  const { courses, colleges } = req.body;
+
+  try {
+    if (!Array.isArray(courses) || !Array.isArray(colleges)) {
+      return res.status(400).json({ message: 'Courses and colleges should be arrays of IDs' });
+    }
+    const updatedUser = await RegisterModel.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          courses: courses,
+          colleges: colleges,
+        },
+      },
+      { new: true }
+    )
+      .populate({ path: 'colleges', model: 'College' })
+      .populate('courses');
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    const updatedCourses = updatedUser.courses || [];
+    const updatedColleges = updatedUser.colleges || [];
+
+    res.status(200).json({ message: 'Preferences updated successfully', updatedCourses, updatedColleges });
+  } catch (error) {
+    console.error('Error updating preferences:', error);
+    res.status(500).json({ message: 'Server error while updating preferences' });
   }
 };

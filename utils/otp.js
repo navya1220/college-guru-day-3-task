@@ -1,4 +1,7 @@
 
-
-export const generateOTP = () => Math.floor(100000 + Math.random() * 900000);
-export const otpExpiry = () => Date.now() + 10 * 60 * 1000; 
+export const otpExpiry = () => {
+    const expiryTime = new Date();
+    expiryTime.setMinutes(expiryTime.getMinutes() + 10); 
+    return expiryTime;
+  };
+  
