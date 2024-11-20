@@ -3,7 +3,6 @@ import bcrypt from 'bcrypt';
 
 const RegisterSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  
   email: {
     type: String,
     required: true,
@@ -15,7 +14,6 @@ const RegisterSchema = new mongoose.Schema({
       message: props => `${props.value} is not a valid email format!`
     }
   },
-
   mobileNumber: {
     type: Number,
     required: true,
@@ -27,60 +25,45 @@ const RegisterSchema = new mongoose.Schema({
       message: props => `${props.value} is not a valid phone number!`
     }
   },
-
   stream: {
     type: String,
     enum: ['Design', 'Engineering', 'Medical', 'Science', 'Others', 'Pharmacy', 'Agriculture', 'Management'],
     required: true,
   },
-
   level: {
     type: String,
     enum: ['PG', 'UG', 'Diploma', 'Ph.D', 'Certificate'],
     required: true,
   },
-
   password: {
     type: String,
     required: true,
-    validate: {
-      validator: function (v) {
-        const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
-        return regex.test(v);
-      },
-      message: 'Password must be at least 8 characters long, include one uppercase letter, one lowercase letter, one number, and one special character.'
-    }
+    minlength: 8,
   },
-
- otp: {
-    type: Number,
+  otp: {
+    type: String,
     validate: {
       validator: function (v) {
-        return /^\d{4,6}$/.test(v);
+        return /^[\d\w]{4,6}$/.test(v); 
       },
       message: props => `${props.value} is not a valid OTP format!`
     }
   },
-
   otpExpires: {
     type: Date,
     default: Date.now,
-    expires: 300 
+    expires: 300, 
   },
-
   isOtpVerified: {
     type: Boolean,
     default: false
   },
-
   resetOtp: { 
     type: String 
   },
-
   resetOtpExpires: { 
     type: Date 
   },
- 
   courses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
   colleges: [{ type: mongoose.Schema.Types.ObjectId, ref: 'College' }],
 });
@@ -92,5 +75,4 @@ RegisterSchema.pre('save', async function (next) {
 });
 
 const RegisterModel = mongoose.model('Register', RegisterSchema);
-
 export default RegisterModel;
