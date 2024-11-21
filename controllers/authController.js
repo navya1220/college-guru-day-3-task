@@ -48,7 +48,39 @@ export const registerUser = async (req, res) => {
 
 
 
-export const loginUser = async (req, res) => {
+export const loginWithEmail = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await RegisterModel.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    const otp = otpGenerator.generate(6, { digits: true, upperCaseAlphabets: false, specialChars: false });
+    console.log("Generated OTP:", otp);
+    user.otp = otp;
+    user.otpExpires = otpExpiry();
+    await user.save();
+
+    try {
+      await sendOTP(user.email, otp);
+    } catch (err) {
+      return res.status(500).json({ message: 'Failed to send OTP. Please try again later.' });
+    }
+    const token = jwt.sign({ userId: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    res.status(200).json({
+      message: 'OTP sent to your email. Please verify it to complete the login process.',
+      token,
+    });
+
+  } catch (error) {
+    console.error('Error during login with email:', error);
+    res.status(500).json({ message: 'Server error, please try again later.' });
+  }
+};
+
+export const loginWithEmailAndPassword = async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -62,30 +94,19 @@ export const loginUser = async (req, res) => {
       return res.status(400).json({ message: 'Invalid credentials.' });
     }
 
-    const otp = otpGenerator.generate(6, { digits: true, upperCaseAlphabets: false, specialChars: false });
-    console.log("Generated OTP:", otp);
-    user.otp = otp;
-    user.otpExpires = otpExpiry();
-    await user.save();
-
-    const token = jwt.sign({ userId: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });  // Corrected here
-
-    try {
-      await sendOTP(user.email, otp);
-    } catch (err) {
-      return res.status(500).json({ message: 'Failed to send OTP. Please try again later.' });
-    }
+    const token = jwt.sign({ userId: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
     res.status(200).json({
-      message: 'OTP sent to your email. Please verify it to complete the login process.',
-      token,  
+      message: 'Login successful.',
+      token,
     });
 
   } catch (error) {
-    console.error('Error during login:', error);
+    console.error('Error during login with email and password:', error);
     res.status(500).json({ message: 'Server error, please try again later.' });
   }
 };
+
 
 
 export const verifyOTP = async (req, res) => {
