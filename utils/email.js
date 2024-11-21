@@ -17,7 +17,7 @@ export const sendOTP = async (email, otp) => {
       from: process.env.EMAIL_USER,
       to: "kallanavya1111@gmail.com",
       subject: 'Your OTP Code',
-      text: `Your OTP code is: ${otp}`,
+      text: `${otp} is your college guru verification OTP. Please do not share it with anyone.`,
     };
   
     try {
