@@ -2,9 +2,10 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import RegisterModel from '../models/userRegister.js';
 import { otpExpiry } from '../utils/otp.js';
-import { sendOTP } from '../utils/email.js';
+
 import { sendNotification } from '../services/notificationService.js';
 import otpGenerator from 'otp-generator';
+import { sendOTPViaSMS } from '../utils/phoneNumber.js';
 
 
 export const registerUser = async (req, res) => {
@@ -47,38 +48,50 @@ export const registerUser = async (req, res) => {
 
 
 
-
-export const loginWithEmail = async (req, res) => {
-  const { email } = req.body;
+export const loginWithPhone = async (req, res) => {
+  const { mobileNumber } = req.body;
 
   try {
-    const user = await RegisterModel.findOne({ email });
+    console.log('Searching for user with phone:', mobileNumber);
+    const user = await RegisterModel.findOne({ mobileNumber });
     if (!user) {
       return res.status(404).json({ message: 'User not found.' });
     }
-
-    const otp = otpGenerator.generate(6, { digits: true, upperCaseAlphabets: false, specialChars: false });
-    console.log("Generated OTP:", otp);
+    const otp = otpGenerator.generate(6, {
+      digits: true,
+      upperCaseAlphabets: false,
+      specialChars: false,
+    });
+    console.log('Generated OTP:', otp);
     user.otp = otp;
     user.otpExpires = otpExpiry();
     await user.save();
 
+    const formattedPhoneNumber = `+91${mobileNumber}`;
+
     try {
-      await sendOTP(user.email, otp);
+      console.log(formattedPhoneNumber)
+      await sendOTPViaSMS(formattedPhoneNumber, otp);
     } catch (err) {
-      return res.status(500).json({ message: 'Failed to send OTP. Please try again later.' });
+      console.error('Error sending OTP:', err);
+      return res.status(500).json({ message: err.message });
     }
-    const token = jwt.sign({ userId: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign(
+      { userId: user._id, mobileNumber },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
     res.status(200).json({
-      message: 'OTP sent to your email. Please verify it to complete the login process.',
+      message: 'OTP sent to your phone number. Please verify it to complete the login process.',
       token,
     });
-
   } catch (error) {
-    console.error('Error during login with email:', error);
+    console.error('Error during login with phone:', error);
     res.status(500).json({ message: 'Server error, please try again later.' });
   }
 };
+
 
 export const loginWithEmailAndPassword = async (req, res) => {
   const { email, password } = req.body;
@@ -110,29 +123,41 @@ export const loginWithEmailAndPassword = async (req, res) => {
 
 
 export const verifyOTP = async (req, res) => {
-  const { email, otp } = req.body;
+  const { mobileNumber, otp } = req.body;
 
   try {
-    const user = await RegisterModel.findOne({ email });
+    const user = await RegisterModel.findOne({ mobileNumber });
     if (!user) {
-      return res.status(404).json({ message: 'User not found.' });
+      return res.status(404).json({
+        status: 404,
+        message: "User not found."
+      });
     }
 
     if (user.otp !== otp || user.otpExpires < Date.now()) {
-      return res.status(400).json({ message: 'Invalid or expired OTP.' });
+      return res.status(400).json({
+        status: 400,
+        message: "Invalid or expired OTP."
+      });
     }
-
     user.otp = null;
     user.otpExpires = null;
     user.isOtpVerified = true;
     await user.save();
 
-    res.status(200).json({ message: 'OTP verified successfully.' });
+    res.status(200).json({
+      status: 200,
+      message: "OTP verified successfully."
+    });
   } catch (error) {
     console.error('Error verifying OTP:', error);
-    res.status(500).json({ message: 'Server error, please try again later.' });
+    res.status(500).json({
+      status: 500,
+      message: "Server error, please try again later."
+    });
   }
 };
+
 
 
 export const forgotPassword = async (req, res) => {
