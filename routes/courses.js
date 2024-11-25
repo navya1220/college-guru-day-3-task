@@ -7,3 +7,5 @@ const router = express.Router();
 router.post("/", authenticateJWT,  createCourse);
 
 export default router;
+
+

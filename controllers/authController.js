@@ -5,7 +5,7 @@ import { otpExpiry } from '../utils/otp.js';
 
 import { sendNotification } from '../services/notificationService.js';
 import otpGenerator from 'otp-generator';
-import { sendOTPViaSMS } from '../utils/phoneNumber.js';
+import { sendOTP } from '../utils/email.js';
 
 
 export const registerUser = async (req, res) => {
@@ -48,49 +48,37 @@ export const registerUser = async (req, res) => {
 
 
 
-export const loginWithPhone = async (req, res) => {
-  const { mobileNumber } = req.body;
+export const loginWithEmail = async (req, res) => {
+  const { email } = req.body;
 
   try {
-    console.log('Searching for user with phone:', mobileNumber);
-    const user = await RegisterModel.findOne({ mobileNumber });
+    const user = await RegisterModel.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: 'User not found.' });
     }
-    const otp = otpGenerator.generate(6, {
-      digits: true,
-      upperCaseAlphabets: false,
-      specialChars: false,
-    });
-    console.log('Generated OTP:', otp);
+
+    const otp = otpGenerator.generate(6, { digits: true, upperCaseAlphabets: false, specialChars: false });
+    console.log("Generated OTP:", otp);
     user.otp = otp;
     user.otpExpires = otpExpiry();
     await user.save();
 
-    const formattedPhoneNumber = `+91${mobileNumber}`;
-
     try {
-      console.log(formattedPhoneNumber)
-      await sendOTPViaSMS(formattedPhoneNumber, otp);
+      await sendOTP(user.email, otp);
     } catch (err) {
-      console.error('Error sending OTP:', err);
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ message: 'Failed to send OTP. Please try again later.' });
     }
-    const token = jwt.sign(
-      { userId: user._id, mobileNumber },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
-
+    const token = jwt.sign({ userId: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.status(200).json({
-      message: 'OTP sent to your phone number. Please verify it to complete the login process.',
+      message: 'OTP sent to your email. Please verify it to complete the login process.',
       token,
     });
+
   } catch (error) {
-    console.error('Error during login with phone:', error);
+    console.error('Error during login with email:', error);
     res.status(500).json({ message: 'Server error, please try again later.' });
   }
-};
+}; 
 
 
 export const loginWithEmailAndPassword = async (req, res) => {
@@ -123,17 +111,16 @@ export const loginWithEmailAndPassword = async (req, res) => {
 
 
 export const verifyOTP = async (req, res) => {
-  const { mobileNumber, otp } = req.body;
+  const { email, otp } = req.body;
 
   try {
-    const user = await RegisterModel.findOne({ mobileNumber });
+    const user = await RegisterModel.findOne({ email });
     if (!user) {
       return res.status(404).json({
         status: 404,
         message: "User not found."
       });
     }
-
     if (user.otp !== otp || user.otpExpires < Date.now()) {
       return res.status(400).json({
         status: 400,
@@ -144,10 +131,16 @@ export const verifyOTP = async (req, res) => {
     user.otpExpires = null;
     user.isOtpVerified = true;
     await user.save();
+    const token = jwt.sign(
+      { userId: user._id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
 
     res.status(200).json({
       status: 200,
-      message: "OTP verified successfully."
+      message: "OTP verified successfully.",
+      token,
     });
   } catch (error) {
     console.error('Error verifying OTP:', error);
@@ -157,6 +150,7 @@ export const verifyOTP = async (req, res) => {
     });
   }
 };
+
 
 
 
